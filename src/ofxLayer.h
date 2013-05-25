@@ -31,7 +31,7 @@
 using namespace std; 
 
 class ofxLayer; 
-
+class ofxLayerManager; 
 class ofxSharedAppData; 
 
 class ofxLayerEventArgs : public ofEventArgs {
@@ -59,7 +59,8 @@ public:
 	ofxLayer()
 	{
 		active = false;
-        bSetup = false; 
+        bSetup = false;
+        bDead = false; 
 	}
 
 	virtual ~ofxLayer() 
@@ -92,6 +93,23 @@ public:
         active = false;     
     } 	
     
+    void deleteMe()
+    {
+        setDead(true); 
+        ofxLayerEventArgs args = ofxLayerEventArgs(layerName, this);
+        ofNotifyEvent(deleteLayerEvent, args, this);
+    }
+    
+    void deleteLayer(string name)
+    {
+        if(name == layerName)
+        {
+            setDead(true);
+        }        
+        ofxLayerEventArgs args = ofxLayerEventArgs(name, this);
+        ofNotifyEvent(deleteLayerEvent, args, this);
+    }
+    
     void activateLayer(string name)
     {
         ofxLayerEventArgs args = ofxLayerEventArgs(name, this); 
@@ -116,7 +134,23 @@ public:
         ofNotifyEvent(switchLayerEvent, args, this);
     }
     
-    ofEvent<ofxLayerEventArgs> switchLayerEvent; 
+    void setManager(ofxLayerManager *_manager)
+    {
+        manager = _manager; 
+    }
+
+    void setDead(bool _bDead)
+    {
+        bDead = _bDead;
+    }
+    
+    bool isDead()
+    {
+        return bDead; 
+    }
+    
+    ofEvent<ofxLayerEventArgs> deleteLayerEvent;
+    ofEvent<ofxLayerEventArgs> switchLayerEvent;
     ofEvent<ofxLayerEventArgs> activateLayerEvent;    
     ofEvent<ofxLayerEventArgs> deactivateLayerEvent;    
     
@@ -175,10 +209,12 @@ public:
 #endif
     
 protected:
+    ofxLayerManager *manager;
     ofxSharedAppData* sharedAppData;
 	string layerName; 
     bool active;    //means that the layer should be updating and drawing
-    bool bSetup; 
+    bool bSetup;
+    bool bDead;
 };
 
 #endif

@@ -69,12 +69,14 @@ public:
 
     void addLayer(ofxLayer* newlayer)
     {
+        newlayer->setManager(this); 
         newlayer->setSharedAppData(sharedAppData);
 //        newlayer->setup();
         layers[newlayer->getLayerName()] = newlayer;
         ofAddListener(newlayer->switchLayerEvent, this, &ofxLayerManager::onSwitchLayer);
         ofAddListener(newlayer->activateLayerEvent, this, &ofxLayerManager::onActivateLayer);
-        ofAddListener(newlayer->deactivateLayerEvent, this, &ofxLayerManager::onDeactivateLayer);        		
+        ofAddListener(newlayer->deactivateLayerEvent, this, &ofxLayerManager::onDeactivateLayer);
+        ofAddListener(newlayer->deleteLayerEvent, this, &ofxLayerManager::onDeleteLayer);        
     }
     
     void onActivateLayer(ofxLayerEventArgs &args)
@@ -92,6 +94,16 @@ public:
         }
     }
 
+    void onDeleteLayer(ofxLayerEventArgs &args)
+    {
+        layerIt it = layers.find(args.layerName);
+        if (it != layers.end())
+        {
+            ofxLayer *l = (ofxLayer *) it->second;
+            deleteLayer(l);
+        }
+    }
+    
     void onDeactivateLayer(ofxLayerEventArgs &args)
     {
         layerIt it = layers.find(args.layerName);
@@ -118,6 +130,11 @@ public:
         }          
     }
     
+    void deleteLayer(ofxLayer *_layer)
+    {
+        _layer->setDead(true);
+    }
+    
 	void activateLayer(ofxLayer *_layer)
 	{
         layerIt it = layers.find(_layer->getLayerName());
@@ -138,7 +155,7 @@ public:
 		layerIt it = layers.find(_layer->getLayerName());        
 		if (it != layers.end())
         {
-            for (layer= layers.begin(); layer != layers.end(); layer++)
+            for (layer= layers.begin(); layer != layers.end(); ++layer)
             {
                 ofxLayer *last = (ofxLayer *) layer->second;                
                 if(last->isSetup())
@@ -161,12 +178,12 @@ public:
 		layerIt it = layers.find(name);        
 		if (it != layers.end())
         {
-            for (layer= layers.begin(); layer != layers.end(); layer++)
+            for (layer= layers.begin(); layer != layers.end(); ++layer)
             {
                 ofxLayer *last = (ofxLayer *) layer->second;                
                 if(last->isSetup())
                 {
-                    last->deactivate(); 
+                    last->deactivate();
                 }
             }
             ofxLayer *l = (ofxLayer *) it->second;
@@ -177,8 +194,21 @@ public:
             }            
             l->activate();             
         }
-    }    
-	
+    }
+    
+	ofxLayer *getActiveLayer()
+    {
+        for (layer= layers.begin(); layer != layers.end(); ++layer)
+        {
+            ofxLayer *l = (ofxLayer *) layer->second;
+            if(l->isActive())
+            {
+                return l;
+            }
+        }
+        return NULL;
+    }
+    
     ofxSharedAppData* getSharedAppData()
     {
         return sharedAppData;
@@ -192,12 +222,22 @@ public:
     vector<string> getLayerNames()
     {
         vector<string> layerNames; 
-        for (layer= layers.begin(); layer != layers.end(); layer++)
+        for (layer= layers.begin(); layer != layers.end(); ++layer)
         {
             ofxLayer *last = (ofxLayer *) layer->second;   
             layerNames.push_back(last->getLayerName());
         }
         return layerNames; 
+    }
+    
+    bool containsLayer(string layerName)
+    {
+        layerIt it = layers.find(layerName);
+		if (it == layers.end())
+        {
+            return false;
+        }
+        return true;
     }
     
     //App Callbacks
@@ -230,15 +270,33 @@ public:
     
     void update()
     {
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
         {
-            if(layer->second->isActive()) { layer->second->update(); }
+            if(layer->second->isDead())
+            {
+                ofxLayer *l = layer->second;
+
+                if(l->isSetup())
+                {
+                    if(l->isActive())
+                    {
+                        l->deactivate();
+                    }
+                    l->exit();
+                }
+                delete l;
+                layers.erase(layer);                
+            }
+            else if(layer->second->isActive())
+            {
+                layer->second->update();
+            }
         }
     }
     
     void draw()
     {
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
         {
             if(layer->second->isActive()) { layer->second->draw(); }
         }
@@ -249,7 +307,7 @@ public:
         cout << "Exiting LayerManager" << endl;
 
         disable();
-        for (layer = layers.begin(); layer != layers.end(); layer++ )
+        for (layer = layers.begin(); layer != layers.end(); ++layer )
         {
             ofxLayer *l = layer->second;
             if(l->isSetup())
@@ -274,29 +332,29 @@ public:
     
     void onTouchUp(ofTouchEventArgs &data) 
     {
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
             if(layer->second->isActive()) { layer->second->touchUp(data); }        
     }
     
     void onTouchDown(ofTouchEventArgs &data)
     {
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
             if(layer->second->isActive()) { layer->second->touchDown(data); }
     }
     
     void onTouchMoved(ofTouchEventArgs &data) 
     {
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
             if(layer->second->isActive()) { layer->second->touchMoved(data); }        
     }
     void onTouchCancelled(ofTouchEventArgs &data)
     {
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
             if(layer->second->isActive()) { layer->second->touchCancelled(data); }
     }
     void onTouchDoubleTap(ofTouchEventArgs &data)
     {
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
             if(layer->second->isActive()) { layer->second->touchDoubleTap(data); }
     }
 #else
@@ -309,14 +367,14 @@ public:
     
     void onKeyPressed(ofKeyEventArgs& data)
     {
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
             if(layer->second->isActive()) { layer->second->keyPressed(data.key); }
         
     }
     
     void onKeyReleased(ofKeyEventArgs& data)
     {
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
             if(layer->second->isActive()) { layer->second->keyReleased(data.key); }
     }    
     //Mouse Callbacks
@@ -330,25 +388,25 @@ public:
     
     void onMouseReleased(ofMouseEventArgs& data) 
     { 
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
             if(layer->second->isActive()) { layer->second->mouseReleased(data); }         
     }
     
     void onMousePressed(ofMouseEventArgs& data) 
     { 
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
             if(layer->second->isActive()) { layer->second->mousePressed(data); }         
     }
     
     void onMouseMoved(ofMouseEventArgs& data) 
     { 
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
             if(layer->second->isActive()) { layer->second->mouseMoved(data); }         
     }
     
     void onMouseDragged(ofMouseEventArgs& data) 
     { 
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
             if(layer->second->isActive()) { layer->second->mouseDragged(data); }             
     }
     
@@ -360,7 +418,7 @@ public:
     
     void onWindowResized(ofResizeEventArgs& data) 
     { 
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
         {
             if(layer->second->isSetup())
             {   
@@ -374,97 +432,97 @@ public:
     
     void urlResponse(ofHttpResponse & response)
     {
-    	for (layer= layers.begin(); layer != layers.end(); layer++ )
+    	for (layer= layers.begin(); layer != layers.end(); ++layer )
 			if(layer->second->isActive()) { layer->second->urlResponse(response); }
     }
 
     void imageSelected(string imageURL)
     {
-    	for (layer= layers.begin(); layer != layers.end(); layer++ )
+    	for (layer= layers.begin(); layer != layers.end(); ++layer )
     		if(layer->second->isActive()) { layer->second->imageSelected(imageURL); }
     }
 
     void gotFile(string url, string filename)
 	{
-		for (layer= layers.begin(); layer != layers.end(); layer++ )
+		for (layer= layers.begin(); layer != layers.end(); ++layer )
 			if(layer->second->isActive()) { layer->second->gotFile(url, filename); }
 	}
 
     void savePressed(string title, string tags)
 	{
-		for (layer= layers.begin(); layer != layers.end(); layer++ )
+		for (layer= layers.begin(); layer != layers.end(); ++layer )
 			if(layer->second->isActive()) { layer->second->savePressed(title, tags); }
 	}
 
     void pause()
     {
-        for (layer= layers.begin(); layer != layers.end(); layer++)
+        for (layer= layers.begin(); layer != layers.end(); ++layer)
             layer->second->pause();         
     }
     
 	void stop()
     {
-        for (layer= layers.begin(); layer != layers.end(); layer++)
+        for (layer= layers.begin(); layer != layers.end(); ++layer)
             layer->second->stop();         
     }
     
     void resume()
     {
-        for (layer= layers.begin(); layer != layers.end(); layer++)
+        for (layer= layers.begin(); layer != layers.end(); ++layer)
             layer->second->resume();         
     }
     
     void reloadTextures()
     {
-        for (layer= layers.begin(); layer != layers.end(); layer++)
+        for (layer= layers.begin(); layer != layers.end(); ++layer)
             layer->second->reloadTextures();             
     }
     
     void onKeyDown(int keyCode)
     {
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
             if(layer->second->isActive()) { layer->second->onKeyDown(keyCode); }             
     }    
     
 	void onKeyUp(int keyCode)
     {
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
             if(layer->second->isActive()) { layer->second->onKeyUp(keyCode); }             
     }
     
 	bool backPressed()
     { 
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
             if(layer->second->isActive()) { return layer->second->backPressed(); }             
     }
 
 	void menuPressed()
     {
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
             if(layer->second->isActive()) { layer->second->menuPressed(); }             
     }
     
 	bool menuItemSelected(string menu_id_str)
     {
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
             if(layer->second->isActive()) { return layer->second->menuItemSelected(menu_id_str); }             
     }    
 	
     bool menuItemChecked(string menu_id_str, bool checked)
     { 
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
             if(layer->second->isActive()) { return layer->second->menuItemChecked(menu_id_str, checked); }             
     }
     
 	void okPressed()
     {
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
             if(layer->second->isActive()) { return layer->second->okPressed(); }                 
     }
 	
     void cancelPressed()
     {
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
             if(layer->second->isActive()) { return layer->second->cancelPressed(); }                 
     }        
 
@@ -475,7 +533,7 @@ public:
     
     void lostFocus()
     {
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
         {
             if(layer->second->isSetup())
             {
@@ -485,7 +543,7 @@ public:
     }
     void gotFocus()
     {
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
         {
             if(layer->second->isSetup())
             {
@@ -496,7 +554,7 @@ public:
     
     void gotMemoryWarning()
     {
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
         {
             if(layer->second->isSetup())
             {
@@ -507,7 +565,7 @@ public:
     
     void deviceOrientationChanged(int newOrientation)
     {
-        for (layer= layers.begin(); layer != layers.end(); layer++ )
+        for (layer= layers.begin(); layer != layers.end(); ++layer )
         {
             if(layer->second->isSetup())
             {
